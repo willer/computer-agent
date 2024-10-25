@@ -1,8 +1,11 @@
 from PyQt6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QTextEdit, 
-                             QPushButton, QLabel, QProgressBar, QSystemTrayIcon, QMenu, QApplication)
+                             QPushButton, QLabel, QProgressBar, QSystemTrayIcon, QMenu, QApplication, QDialog, QLineEdit)
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread
-from PyQt6.QtGui import QFont, QIcon, QColor, QPalette, QFontDatabase
+from PyQt6.QtGui import QFont, QIcon, QColor, QPalette, QFontDatabase, QKeySequence, QShortcut
 import qtawesome as qta
+from store import Store  # Add this import
+from anthropic_client import AnthropicClient  # Add this import
+
 
 class AgentThread(QThread):
     update_signal = pyqtSignal(str)
@@ -22,13 +25,90 @@ class MainWindow(QMainWindow):
         self.store = store
         self.anthropic_client = anthropic_client
         
+        # Check if API key is missing
+        if self.store.error and "ANTHROPIC_API_KEY not found" in self.store.error:
+            self.show_api_key_dialog()
+        
         self.setWindowTitle("Grunty 👨🏽‍💻")
-        self.setGeometry(100, 100, 350, 600)
+        self.setGeometry(100, 100, 400, 700)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         
         self.setup_ui()
         self.setup_tray()
+        self.setup_shortcuts()
         
+    def show_api_key_dialog(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("API Key Required")
+        dialog.setFixedWidth(400)
+        
+        layout = QVBoxLayout()
+        
+        # Icon and title
+        title_layout = QHBoxLayout()
+        icon_label = QLabel()
+        icon_label.setPixmap(qta.icon('fa5s.key', color='#4CAF50').pixmap(32, 32))
+        title_layout.addWidget(icon_label)
+        title_label = QLabel("Anthropic API Key Required")
+        title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #4CAF50;")
+        title_layout.addWidget(title_label)
+        layout.addLayout(title_layout)
+        
+        # Description
+        desc_label = QLabel("Please enter your Anthropic API key to continue. You can find this in your Anthropic dashboard.")
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("color: #666; margin: 10px 0;")
+        layout.addWidget(desc_label)
+        
+        # API Key input
+        self.api_key_input = QLineEdit()
+        self.api_key_input.setPlaceholderText("sk-ant-...")
+        self.api_key_input.setStyleSheet("""
+            QLineEdit {
+                padding: 10px;
+                border: 2px solid #4CAF50;
+                border-radius: 5px;
+                font-size: 14px;
+            }
+        """)
+        layout.addWidget(self.api_key_input)
+        
+        # Save button
+        save_btn = QPushButton("Save API Key")
+        save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px;
+                border-radius: 5px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        save_btn.clicked.connect(lambda: self.save_api_key(dialog))
+        layout.addWidget(save_btn)
+        
+        dialog.setLayout(layout)
+        dialog.exec()
+
+    def save_api_key(self, dialog):
+        api_key = self.api_key_input.text().strip()
+        if not api_key:
+            return
+            
+        # Save to .env file
+        with open('.env', 'w') as f:
+            f.write(f'ANTHROPIC_API_KEY={api_key}')
+            
+        # Reinitialize the store and anthropic client
+        self.store = Store()
+        self.anthropic_client = AnthropicClient()
+        dialog.accept()
+
     def setup_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -205,11 +285,29 @@ class MainWindow(QMainWindow):
         
     def update_log(self, message):
         if message.startswith("Assistant:"):
-            self.action_log.append(f'<p style="color: #4CAF50;"><strong>{message}</strong></p>')
+            icon = qta.icon('fa5s.robot', color='#4CAF50')
+            pixmap = icon.pixmap(32, 32)
+            icon_html = f'<img src="data:image/png;base64,{self.pixmap_to_base64(pixmap)}" width="32" height="32"/>'
+            self.action_log.append(f'''
+                <div style="display: flex; align-items: center; margin: 10px 0; background-color: #2C2C2C; padding: 10px; border-radius: 5px;">
+                    {icon_html}
+                    <div style="margin-left: 10px;">
+                        <p style="color: #4CAF50; margin: 0;"><strong>{message}</strong></p>
+                    </div>
+                </div>
+            ''')
         elif message.startswith("Assistant action:"):
-            self.action_log.append(f'<p style="color: #2196F3;"><em>{message}</em></p>')
+            icon = qta.icon('fa5s.cogs', color='#2196F3')
+            pixmap = icon.pixmap(24, 24)
+            icon_html = f'<img src="data:image/base64;base64,{self.pixmap_to_base64(pixmap)}" width="24" height="24"/>'
+            self.action_log.append(f'''
+                <div style="display: flex; align-items: center; margin: 5px 0; padding: 5px;">
+                    {icon_html}
+                    <p style="color: #2196F3; margin: 0 0 0 10px;"><em>{message}</em></p>
+                </div>
+            ''')
         else:
-            self.action_log.append(f'<p>{message}</p>')
+            self.action_log.append(f'<p style="margin: 5px 0; color: #CCCCCC;">{message}</p>')
         
         # Scroll to the bottom of the log
         self.action_log.verticalScrollBar().setValue(self.action_log.verticalScrollBar().maximum())
@@ -235,3 +333,65 @@ class MainWindow(QMainWindow):
     def quit_application(self):
         self.tray_icon.hide()
         QApplication.quit()
+
+    def pixmap_to_base64(self, pixmap):
+        from PyQt6.QtCore import QByteArray, QBuffer
+        import base64
+        
+        byte_array = QByteArray()
+        buffer = QBuffer(byte_array)
+        buffer.open(QBuffer.OpenModeFlag.WriteOnly)
+        pixmap.save(buffer, 'PNG')
+        
+        return base64.b64encode(byte_array.data()).decode()
+
+    def setup_shortcuts(self):
+        # Send message with Ctrl+Enter or just Enter
+        send_shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
+        send_shortcut.activated.connect(self.run_agent)
+        
+        enter_shortcut = QShortcut(QKeySequence("Return"), self)
+        enter_shortcut.activated.connect(self.handle_return)
+        
+        # Clear input with Escape
+        clear_shortcut = QShortcut(QKeySequence("Escape"), self)
+        clear_shortcut.activated.connect(self.clear_input)
+        
+        # Focus input with Ctrl+L
+        focus_shortcut = QShortcut(QKeySequence("Ctrl+L"), self)
+        focus_shortcut.activated.connect(lambda: self.input_area.setFocus())
+        
+        # Stop agent with Ctrl+S
+        stop_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        stop_shortcut.activated.connect(self.stop_agent)
+        
+        # Toggle window visibility with Ctrl+H
+        toggle_shortcut = QShortcut(QKeySequence("Ctrl+H"), self)
+        toggle_shortcut.activated.connect(self.toggle_visibility)
+        
+        # Clear log with Ctrl+K
+        clear_log_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
+        clear_log_shortcut.activated.connect(lambda: self.action_log.clear())
+
+    def handle_return(self):
+        # If Shift is not pressed when Enter is hit, send the message
+        if not QApplication.keyboardModifiers() & Qt.KeyboardModifier.ShiftModifier:
+            # Only run if there's text and the run button is enabled
+            if self.run_button.isEnabled():
+                self.run_agent()
+        else:
+            # If Shift+Enter, insert a newline
+            cursor = self.input_area.textCursor()
+            cursor.insertText('\n')
+
+    def clear_input(self):
+        self.input_area.clear()
+        self.input_area.setFocus()
+
+    def toggle_visibility(self):
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
+            self.raise_()
+            self.activateWindow()
