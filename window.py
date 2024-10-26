@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QTextEdit, 
-                             QPushButton, QLabel, QProgressBar, QSystemTrayIcon, QMenu, QApplication, QDialog, QLineEdit)
+                             QPushButton, QLabel, QProgressBar, QSystemTrayIcon, QMenu, QApplication, QDialog, QLineEdit, QMenuBar)
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread
-from PyQt6.QtGui import QFont, QIcon, QColor, QPalette, QFontDatabase, QKeySequence, QShortcut
+from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QAction, QTextCursor
 import qtawesome as qta
 from store import Store  # Add this import
 from anthropic_client import AnthropicClient  # Add this import
@@ -30,10 +30,15 @@ class MainWindow(QMainWindow):
             self.show_api_key_dialog()
         
         self.setWindowTitle("Grunty 👨🏽‍💻")
-        self.setGeometry(100, 100, 400, 700)
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setGeometry(100, 100, 400, 600)
+        self.setMinimumSize(300, 400)
+        
+        # Set rounded corners and border
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
         self.setup_ui()
+        self.setup_menu_bar()
         self.setup_tray()
         self.setup_shortcuts()
         
@@ -113,48 +118,95 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        layout = QVBoxLayout()
-        central_widget.setLayout(layout)
+        # Main layout with padding for shadow
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(15, 15, 15, 15)  # Padding for shadow
+        central_widget.setLayout(main_layout)
+        
+        # Container widget for rounded corners
+        container = QWidget()
+        container.setObjectName("container")
+        container.setStyleSheet("""
+            QWidget#container {
+                background-color: #1a1a1a;
+                border-radius: 12px;
+                border: 1px solid #333333;
+            }
+        """)
+        container_layout = QVBoxLayout()
+        container.setLayout(container_layout)
         
         # Title bar
         title_bar = QWidget()
         title_bar_layout = QHBoxLayout()
         title_bar.setLayout(title_bar_layout)
-        title_bar.setStyleSheet("background-color: #2C2C2C;")
+        title_bar.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+                border-top-left-radius: 12px;
+                border-top-right-radius: 12px;
+            }
+        """)
         
         title_label = QLabel("Grunty 👨🏽‍💻")
-        title_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: white;")
+        title_label.setFont(QFont("Inter", 16, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #ffffff; padding: 5px;")
         title_bar_layout.addWidget(title_label)
         
         title_bar_layout.addStretch()
         
-        minimize_button = QPushButton(qta.icon('fa5s.window-minimize', color='white'), "")
+        # Window controls with modern icons
+        minimize_button = QPushButton(qta.icon('fa5s.minus', color='#ffffff'), "")
         minimize_button.setFlat(True)
-        close_button = QPushButton(qta.icon('fa5s.times', color='white'), "")
+        minimize_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border-radius: 8px;
+                padding: 4px 8px;
+            }
+            QPushButton:hover {
+                background-color: #333333;
+            }
+        """)
+        
+        close_button = QPushButton(qta.icon('fa5s.times', color='#ffffff'), "")
         close_button.setFlat(True)
+        close_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border-radius: 8px;
+                padding: 4px 8px;
+            }
+            QPushButton:hover {
+                background-color: #ff4444;
+            }
+        """)
+        
         title_bar_layout.addWidget(minimize_button)
         title_bar_layout.addWidget(close_button)
+        container_layout.addWidget(title_bar)
         
-        layout.addWidget(title_bar)
-        
-        # Input area
+        # Input area with modern styling
         self.input_area = QTextEdit()
         self.input_area.setPlaceholderText("What can I do for you today?")
         self.input_area.setStyleSheet("""
             QTextEdit {
-                background-color: #3A3A3A;
-                border: 1px solid #4A4A4A;
-                border-radius: 5px;
-                color: white;
-                padding: 10px;
+                background-color: #262626;
+                border: 1px solid #333333;
+                border-radius: 8px;
+                color: #ffffff;
+                padding: 12px;
+                font-family: Inter;
                 font-size: 14px;
+                selection-background-color: #4CAF50;
+            }
+            QTextEdit:focus {
+                border: 1px solid #4CAF50;
             }
         """)
-        self.input_area.textChanged.connect(self.update_run_button)
-        layout.addWidget(self.input_area)
+        container_layout.addWidget(self.input_area)
         
-        # Control buttons
+        # Control buttons with modern styling
         control_layout = QHBoxLayout()
         self.run_button = QPushButton(qta.icon('fa5s.play', color='white'), "Let's Go")
         self.run_button.setStyleSheet("""
@@ -163,7 +215,8 @@ class MainWindow(QMainWindow):
                 color: white;
                 border: none;
                 padding: 10px 20px;
-                border-radius: 5px;
+                border-radius: 8px;
+                font-family: Inter;
                 font-size: 14px;
                 font-weight: bold;
             }
@@ -171,65 +224,86 @@ class MainWindow(QMainWindow):
                 background-color: #45a049;
             }
             QPushButton:disabled {
-                background-color: #808080;
+                background-color: #333333;
+                color: #666666;
             }
         """)
-        self.run_button.setEnabled(False)
+        
         self.stop_button = QPushButton(qta.icon('fa5s.stop', color='white'), "Stop")
         self.stop_button.setStyleSheet("""
             QPushButton {
-                background-color: #f44336;
+                background-color: #ff4444;
                 color: white;
                 border: none;
                 padding: 10px 20px;
-                border-radius: 5px;
+                border-radius: 8px;
+                font-family: Inter;
                 font-size: 14px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #d32f2f;
+                background-color: #ff3333;
             }
             QPushButton:disabled {
-                background-color: #808080;
+                background-color: #333333;
+                color: #666666;
             }
         """)
-        self.stop_button.setEnabled(False)
+        
         control_layout.addWidget(self.run_button)
         control_layout.addWidget(self.stop_button)
-        layout.addLayout(control_layout)
+        container_layout.addLayout(control_layout)
         
-        # Progress bar
+        # Progress bar with modern styling
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        self.progress_bar.setRange(0, 0)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
-                border: 1px solid #4A4A4A;
-                border-radius: 5px;
-                background-color: #3A3A3A;
-                height: 10px;
+                border: none;
+                border-radius: 4px;
+                background-color: #262626;
+                height: 4px;
+                margin: 8px 0px;
             }
             QProgressBar::chunk {
                 background-color: #4CAF50;
+                border-radius: 4px;
             }
         """)
         self.progress_bar.hide()
-        layout.addWidget(self.progress_bar)
+        container_layout.addWidget(self.progress_bar)
         
-        # Action log
+        # Action log with modern styling
         self.action_log = QTextEdit()
         self.action_log.setReadOnly(True)
         self.action_log.setStyleSheet("""
             QTextEdit {
-                background-color: #2C2C2C;
-                border: 1px solid #4A4A4A;
-                border-radius: 5px;
-                color: #CCCCCC;
-                padding: 10px;
-                font-size: 12px;
+                background-color: #262626;
+                border: 1px solid #333333;
+                border-radius: 8px;
+                color: #ffffff;
+                padding: 12px;
+                font-family: Inter;
+                font-size: 13px;
             }
         """)
-        layout.addWidget(self.action_log)
+        container_layout.addWidget(self.action_log)
+        
+        # Add the container to the main layout
+        main_layout.addWidget(container)
+        
+        # Set window shadow and background
+        self.setStyleSheet("""
+            MainWindow {
+                background-color: transparent;
+            }
+            QWidget#container {
+                background-color: #1a1a1a;
+                border-radius: 12px;
+                border: 1px solid #333333;
+            }
+        """)
         
         # Connect signals
         self.run_button.clicked.connect(self.run_agent)
@@ -237,25 +311,107 @@ class MainWindow(QMainWindow):
         minimize_button.clicked.connect(self.showMinimized)
         close_button.clicked.connect(self.close)
         
-        # Set window background
-        self.setStyleSheet("background-color: #333333;")
-        
     def update_run_button(self):
         self.run_button.setEnabled(bool(self.input_area.toPlainText().strip()))
         
+    def setup_menu_bar(self):
+        # Create menu bar
+        menubar = QMenuBar(self)
+        self.setMenuBar(menubar)
+        
+        # File menu
+        file_menu = menubar.addMenu('File')
+        
+        # Add actions
+        new_task = QAction('New Task', self)
+        new_task.setShortcut('Ctrl+N')
+        new_task.triggered.connect(self.show)
+        
+        quit_action = QAction('Quit', self)
+        quit_action.setShortcut('Ctrl+Q')
+        quit_action.triggered.connect(self.quit_application)
+        
+        file_menu.addAction(new_task)
+        file_menu.addSeparator()
+        file_menu.addAction(quit_action)
+
     def setup_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(qta.icon('fa5s.robot'))
+        # Make the icon larger and more visible
+        icon = qta.icon('fa5s.robot', scale_factor=1.5, color='white')
+        self.tray_icon.setIcon(icon)
         
+        # Create the tray menu
         tray_menu = QMenu()
-        show_action = tray_menu.addAction("Show")
-        show_action.triggered.connect(self.show)
-        quit_action = tray_menu.addAction("Quit")
+        
+        # Add a title item (non-clickable)
+        title_action = tray_menu.addAction("Grunty 👨🏽‍💻")
+        title_action.setEnabled(False)
+        tray_menu.addSeparator()
+        
+        # Add "New Task" option with icon
+        new_task = tray_menu.addAction(qta.icon('fa5s.plus', color='white'), "New Task")
+        new_task.triggered.connect(self.show)
+        
+        # Add "Show/Hide" toggle with icon
+        toggle_action = tray_menu.addAction(qta.icon('fa5s.eye', color='white'), "Show/Hide")
+        toggle_action.triggered.connect(self.toggle_window)
+        
+        tray_menu.addSeparator()
+        
+        # Add Quit option with icon
+        quit_action = tray_menu.addAction(qta.icon('fa5s.power-off', color='white'), "Quit")
         quit_action.triggered.connect(self.quit_application)
+        
+        # Style the menu for dark mode
+        tray_menu.setStyleSheet("""
+            QMenu {
+                background-color: #333333;
+                color: white;
+                border: 1px solid #444444;
+                border-radius: 6px;
+                padding: 5px;
+            }
+            QMenu::item {
+                padding: 8px 25px 8px 8px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #4CAF50;
+            }
+            QMenu::separator {
+                height: 1px;
+                background: #444444;
+                margin: 5px 0px;
+            }
+        """)
         
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.show()
         
+        # Show a notification when the app starts
+        self.tray_icon.showMessage(
+            "Grunty is running",
+            "Click the robot icon in the menu bar to get started!",
+            QSystemTrayIcon.MessageIcon.Information,
+            3000
+        )
+        
+        # Connect double-click to toggle window
+        self.tray_icon.activated.connect(self.tray_icon_activated)
+
+    def tray_icon_activated(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self.toggle_window()
+
+    def toggle_window(self):
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
+            self.raise_()
+            self.activateWindow()
+
     def run_agent(self):
         instructions = self.input_area.toPlainText()
         if not instructions:
@@ -321,17 +477,18 @@ class MainWindow(QMainWindow):
         self.oldPos = event.globalPosition().toPoint()
         
     def closeEvent(self, event):
+        # Override close event to minimize to tray instead of quitting
         event.ignore()
         self.hide()
         self.tray_icon.showMessage(
             "Grunty 👨🏽‍💻",
-            "Application minimized to tray. Click the tray icon to restore.",
+            "Application minimized to tray",
             QSystemTrayIcon.MessageIcon.Information,
             2000
         )
         
     def quit_application(self):
-        self.tray_icon.hide()
+        # Actually quit the application
         QApplication.quit()
 
     def pixmap_to_base64(self, pixmap):
@@ -346,52 +503,47 @@ class MainWindow(QMainWindow):
         return base64.b64encode(byte_array.data()).decode()
 
     def setup_shortcuts(self):
-        # Send message with Ctrl+Enter or just Enter
-        send_shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
-        send_shortcut.activated.connect(self.run_agent)
+        # Essential shortcuts
+        close_window = QShortcut(QKeySequence("Ctrl+W"), self)
+        close_window.activated.connect(self.close)
         
-        enter_shortcut = QShortcut(QKeySequence("Return"), self)
-        enter_shortcut.activated.connect(self.handle_return)
+        # Allow tab for indentation
+        self.input_area.setTabChangesFocus(False)
         
-        # Clear input with Escape
-        clear_shortcut = QShortcut(QKeySequence("Escape"), self)
-        clear_shortcut.activated.connect(self.clear_input)
-        
-        # Focus input with Ctrl+L
-        focus_shortcut = QShortcut(QKeySequence("Ctrl+L"), self)
-        focus_shortcut.activated.connect(lambda: self.input_area.setFocus())
-        
-        # Stop agent with Ctrl+S
-        stop_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
-        stop_shortcut.activated.connect(self.stop_agent)
-        
-        # Toggle window visibility with Ctrl+H
-        toggle_shortcut = QShortcut(QKeySequence("Ctrl+H"), self)
-        toggle_shortcut.activated.connect(self.toggle_visibility)
-        
-        # Clear log with Ctrl+K
-        clear_log_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
-        clear_log_shortcut.activated.connect(lambda: self.action_log.clear())
+        # Custom text editing handlers
+        self.input_area.keyPressEvent = self.handle_input_keypress
 
-    def handle_return(self):
-        # If Shift is not pressed when Enter is hit, send the message
-        if not QApplication.keyboardModifiers() & Qt.KeyboardModifier.ShiftModifier:
-            # Only run if there's text and the run button is enabled
-            if self.run_button.isEnabled():
-                self.run_agent()
+    def handle_input_keypress(self, event):
+        # Get cursor and text
+        cursor = self.input_area.textCursor()
+        text = self.input_area.toPlainText()
+        position = cursor.position()
+        
+        # Handle Ctrl + Backspace (delete entire line)
+        if event.key() == Qt.Key.Key_Backspace and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            # Find the start and end of the current line
+            line_start = text.rfind('\n', 0, position)
+            line_start = line_start + 1 if line_start != -1 else 0
+            line_end = text.find('\n', position)
+            line_end = line_end if line_end != -1 else len(text)
+            
+            # Select and delete the entire line
+            cursor.setPosition(line_start)
+            cursor.setPosition(line_end, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+            
+            # Remove the extra newline if we're not at the start of the document
+            if line_start > 0 and cursor.position() == line_start:
+                cursor.deletePreviousChar()
+        
+        # Default handling for other keys
         else:
-            # If Shift+Enter, insert a newline
-            cursor = self.input_area.textCursor()
-            cursor.insertText('\n')
+            QTextEdit.keyPressEvent(self.input_area, event)
 
-    def clear_input(self):
-        self.input_area.clear()
-        self.input_area.setFocus()
 
-    def toggle_visibility(self):
-        if self.isVisible():
-            self.hide()
-        else:
-            self.show()
-            self.raise_()
-            self.activateWindow()
+
+
+
+
+
+

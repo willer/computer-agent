@@ -4,7 +4,7 @@ from anthropic_client import AnthropicClient
 from computer_control import ComputerControl
 from anthropic.types.beta import BetaMessage, BetaToolUseBlock, BetaTextBlock
 
-# Configure logging
+
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
