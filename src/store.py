@@ -1,6 +1,6 @@
 import logging
-from anthropic_client import AnthropicClient
-from computer_control import ComputerControl
+from .anthropic import AnthropicClient
+from .computer import ComputerControl
 from anthropic.types.beta import BetaMessage, BetaToolUseBlock, BetaTextBlock
 import json
 

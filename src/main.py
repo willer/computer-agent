@@ -1,9 +1,9 @@
 import sys
 import logging
 from PyQt6.QtWidgets import QApplication
-from window import MainWindow
-from store import Store
-from anthropic_client import AnthropicClient
+from .window import MainWindow
+from .store import Store
+from .anthropic import AnthropicClient
 
 logging.basicConfig(filename='agent.log', level=logging.DEBUG, 
                     format='%(asctime)s - %(levelname)s - %(message)s')

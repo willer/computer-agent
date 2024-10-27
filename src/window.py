@@ -1,11 +1,11 @@
 from PyQt6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QTextEdit, 
                              QPushButton, QLabel, QProgressBar, QSystemTrayIcon, QMenu, QApplication, QDialog, QLineEdit, QMenuBar)
-from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread
-from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QAction, QTextCursor
-import qtawesome as qta
-from store import Store  # Add this import
-from anthropic_client import AnthropicClient  # Add this import
+from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread, QUrl
+from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QAction, QTextCursor, QDesktopServices
+from .store import Store
+from .anthropic import AnthropicClient  
 import logging
+import qtawesome as qta
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +152,23 @@ class MainWindow(QMainWindow):
         title_bar_layout.addStretch()
         
         # Window controls
+        github_button = QPushButton()
+        github_button.setIcon(qta.icon('fa5b.github', color='white'))  # Using qtawesome for GitHub icon
+        github_button.setFlat(True)
+        github_button.setStyleSheet("""
+            QPushButton {
+                color: #ffffff;
+                background-color: transparent;
+                border-radius: 8px;
+                padding: 4px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #333333;
+            }
+        """)
+        github_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl('https://github.com/suitedaces/computer-agent')))
+        
         minimize_button = QPushButton("—")
         minimize_button.setFlat(True)
         minimize_button.setStyleSheet("""
@@ -183,6 +200,7 @@ class MainWindow(QMainWindow):
             }
         """)
         
+        title_bar_layout.addWidget(github_button)
         title_bar_layout.addWidget(minimize_button)
         title_bar_layout.addWidget(close_button)
         container_layout.addWidget(title_bar)
@@ -677,26 +695,3 @@ class MainWindow(QMainWindow):
         # Default handling for other keys
         else:
             QTextEdit.keyPressEvent(self.input_area, event)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
