@@ -6,7 +6,7 @@ Self-hosted desktop app to have AI control your computer, powered by the new Cla
 Here, I asked it to use [vim](https://vim.rtorr.com/) to create a game in Python, run it, and play it.
 
 https://github.com/user-attachments/assets/fa9b195e-fae6-4dbc-adb9-dc42519624b1
-
+Video was sped up 8x btw. [Computer use](https://www.anthropic.com/news/3-5-models-and-computer-use) is pretty slow as of today.
 
 ## ⚠️ Important Disclaimers
 
