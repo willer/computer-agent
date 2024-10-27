@@ -5,7 +5,9 @@ from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QAction, QTextCursor
 import qtawesome as qta
 from store import Store  # Add this import
 from anthropic_client import AnthropicClient  # Add this import
+import logging
 
+logger = logging.getLogger(__name__)
 
 class AgentThread(QThread):
     update_signal = pyqtSignal(str)
@@ -29,9 +31,9 @@ class MainWindow(QMainWindow):
         if self.store.error and "ANTHROPIC_API_KEY not found" in self.store.error:
             self.show_api_key_dialog()
         
-        self.setWindowTitle("Grunty 👨🏽‍💻")
+        self.setWindowTitle("Grunty 👨💻")
         self.setGeometry(100, 100, 400, 600)
-        self.setMinimumSize(300, 400)
+        self.setMinimumSize(400, 500)  # Increased minimum size for better usability
         
         # Set rounded corners and border
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
@@ -120,7 +122,7 @@ class MainWindow(QMainWindow):
         
         # Main layout with padding for shadow
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(15, 15, 15, 15)  # Padding for shadow
+        main_layout.setContentsMargins(15, 15, 15, 15)
         central_widget.setLayout(main_layout)
         
         # Container widget for rounded corners
@@ -134,19 +136,13 @@ class MainWindow(QMainWindow):
             }
         """)
         container_layout = QVBoxLayout()
+        container_layout.setSpacing(0)  # Remove spacing between elements
         container.setLayout(container_layout)
         
         # Title bar
         title_bar = QWidget()
         title_bar_layout = QHBoxLayout()
         title_bar.setLayout(title_bar_layout)
-        title_bar.setStyleSheet("""
-            QWidget {
-                background-color: transparent;
-                border-top-left-radius: 12px;
-                border-top-right-radius: 12px;
-            }
-        """)
         
         title_label = QLabel("Grunty 👨🏽‍💻")
         title_label.setFont(QFont("Inter", 16, QFont.Weight.Bold))
@@ -155,27 +151,32 @@ class MainWindow(QMainWindow):
         
         title_bar_layout.addStretch()
         
-        # Window controls with modern icons
-        minimize_button = QPushButton(qta.icon('fa5s.minus', color='#ffffff'), "")
+        # Window controls
+        minimize_button = QPushButton("—")
         minimize_button.setFlat(True)
         minimize_button.setStyleSheet("""
             QPushButton {
+                color: #ffffff;
                 background-color: transparent;
                 border-radius: 8px;
-                padding: 4px 8px;
+                padding: 4px 12px;
+                font-weight: bold;
             }
             QPushButton:hover {
                 background-color: #333333;
             }
         """)
         
-        close_button = QPushButton(qta.icon('fa5s.times', color='#ffffff'), "")
+        close_button = QPushButton("×")
         close_button.setFlat(True)
         close_button.setStyleSheet("""
             QPushButton {
+                color: #ffffff;
                 background-color: transparent;
                 border-radius: 8px;
-                padding: 4px 8px;
+                padding: 4px 12px;
+                font-weight: bold;
+                font-size: 16px;
             }
             QPushButton:hover {
                 background-color: #ff4444;
@@ -186,9 +187,57 @@ class MainWindow(QMainWindow):
         title_bar_layout.addWidget(close_button)
         container_layout.addWidget(title_bar)
         
+        # Action log with modern styling - Now at the top with flexible space
+        self.action_log = QTextEdit()
+        self.action_log.setReadOnly(True)
+        self.action_log.setStyleSheet("""
+            QTextEdit {
+                background-color: #262626;
+                border: none;
+                border-radius: 0;
+                color: #ffffff;
+                padding: 16px;
+                font-family: Inter;
+                font-size: 13px;
+            }
+        """)
+        container_layout.addWidget(self.action_log, stretch=1)  # Give it flexible space
+        
+        # Progress bar - Now above input area
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: none;
+                background-color: #262626;
+                height: 2px;
+                margin: 0;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+            }
+        """)
+        self.progress_bar.hide()
+        container_layout.addWidget(self.progress_bar)
+
+        # Input section container - Fixed height at bottom
+        input_section = QWidget()
+        input_section.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e1e;
+                border-top: 1px solid #333333;
+            }
+        """)
+        input_layout = QVBoxLayout()
+        input_layout.setContentsMargins(16, 16, 16, 16)
+        input_layout.setSpacing(12)
+        input_section.setLayout(input_layout)
+
         # Input area with modern styling
         self.input_area = QTextEdit()
         self.input_area.setPlaceholderText("What can I do for you today?")
+        self.input_area.setFixedHeight(100)  # Fixed height for input
         self.input_area.setStyleSheet("""
             QTextEdit {
                 background-color: #262626;
@@ -204,92 +253,65 @@ class MainWindow(QMainWindow):
                 border: 1px solid #4CAF50;
             }
         """)
-        container_layout.addWidget(self.input_area)
-        
+        input_layout.addWidget(self.input_area)
+
         # Control buttons with modern styling
         control_layout = QHBoxLayout()
-        self.run_button = QPushButton(qta.icon('fa5s.play', color='white'), "Let's Go")
-        self.run_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-                font-family: Inter;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-            QPushButton:disabled {
-                background-color: #333333;
-                color: #666666;
-            }
-        """)
+        control_layout.setSpacing(8)
         
+        self.run_button = QPushButton(qta.icon('fa5s.play', color='white'), "Let's Go")
         self.stop_button = QPushButton(qta.icon('fa5s.stop', color='white'), "Stop")
-        self.stop_button.setStyleSheet("""
-            QPushButton {
-                background-color: #ff4444;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-                font-family: Inter;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #ff3333;
-            }
-            QPushButton:disabled {
-                background-color: #333333;
-                color: #666666;
-            }
-        """)
+        
+        for button in (self.run_button, self.stop_button):
+            button.setFixedHeight(40)
+            if button == self.run_button:
+                button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        padding: 0 24px;
+                        font-family: Inter;
+                        font-size: 14px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #45a049;
+                    }
+                    QPushButton:disabled {
+                        background-color: #333333;
+                        color: #666666;
+                    }
+                """)
+            else:
+                button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #ff4444;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        padding: 0 24px;
+                        font-family: Inter;
+                        font-size: 14px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #ff3333;
+                    }
+                    QPushButton:disabled {
+                        background-color: #333333;
+                        color: #666666;
+                    }
+                """)
         
         control_layout.addWidget(self.run_button)
         control_layout.addWidget(self.stop_button)
-        container_layout.addLayout(control_layout)
-        
-        # Progress bar with modern styling
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: none;
-                border-radius: 4px;
-                background-color: #262626;
-                height: 4px;
-                margin: 8px 0px;
-            }
-            QProgressBar::chunk {
-                background-color: #4CAF50;
-                border-radius: 4px;
-            }
-        """)
-        self.progress_bar.hide()
-        container_layout.addWidget(self.progress_bar)
-        
-        # Action log with modern styling
-        self.action_log = QTextEdit()
-        self.action_log.setReadOnly(True)
-        self.action_log.setStyleSheet("""
-            QTextEdit {
-                background-color: #262626;
-                border: 1px solid #333333;
-                border-radius: 8px;
-                color: #ffffff;
-                padding: 12px;
-                font-family: Inter;
-                font-size: 13px;
-            }
-        """)
-        container_layout.addWidget(self.action_log)
-        
+        input_layout.addLayout(control_layout)
+
+        # Add input section to main container
+        container_layout.addWidget(input_section)
+
         # Add the container to the main layout
         main_layout.addWidget(container)
         
@@ -437,36 +459,140 @@ class MainWindow(QMainWindow):
         self.run_button.setEnabled(True)
         self.stop_button.setEnabled(False)
         self.progress_bar.hide()
-        self.update_log("Agent run completed.")
+        
+        # Yellow completion message with sparkle emoji
+        completion_message = '''
+            <div style="margin: 6px 0;">
+                <span style="
+                    display: inline-flex;
+                    align-items: center;
+                    background-color: rgba(45, 45, 45, 0.95);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 100px;
+                    padding: 4px 12px;
+                    color: #FFD700;
+                    font-family: Inter, -apple-system, system-ui, sans-serif;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    white-space: nowrap;
+                ">✨ Agent run completed</span>
+            </div>
+        '''
+        self.action_log.append(completion_message)
+        
         
     def update_log(self, message):
-        if message.startswith("Assistant:"):
-            icon = qta.icon('fa5s.robot', color='#4CAF50')
-            pixmap = icon.pixmap(32, 32)
-            icon_html = f'<img src="data:image/png;base64,{self.pixmap_to_base64(pixmap)}" width="32" height="32"/>'
-            self.action_log.append(f'''
-                <div style="display: flex; align-items: center; margin: 10px 0; background-color: #2C2C2C; padding: 10px; border-radius: 5px;">
-                    {icon_html}
-                    <div style="margin-left: 10px;">
-                        <p style="color: #4CAF50; margin: 0;"><strong>{message}</strong></p>
-                    </div>
+        if message.startswith("Performed action:"):
+            action_text = message.replace("Performed action:", "").strip()
+            
+            # Pill-shaped button style with green text
+            button_style = '''
+                <div style="margin: 6px 0;">
+                    <span style="
+                        display: inline-flex;
+                        align-items: center;
+                        background-color: rgba(45, 45, 45, 0.95);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        border-radius: 100px;
+                        padding: 4px 12px;
+                        color: #4CAF50;
+                        font-family: Inter, -apple-system, system-ui, sans-serif;
+                        font-size: 13px;
+                        line-height: 1.4;
+                        white-space: nowrap;
+                    ">{}</span>
                 </div>
-            ''')
+            '''
+            
+            try:
+                import json
+                action_data = json.loads(action_text)
+                action_type = action_data.get('type', '').lower()
+                
+                if action_type == "type":
+                    text = action_data.get('text', '')
+                    msg = f'⌨️ <span style="margin: 0 4px; color: #4CAF50;">Typed</span> <span style="color: #4CAF50">"{text}"</span>'
+                    self.action_log.append(button_style.format(msg))
+                    
+                elif action_type == "key":
+                    key = action_data.get('text', '')
+                    msg = f'⌨️ <span style="margin: 0 4px; color: #4CAF50;">Pressed</span> <span style="color: #4CAF50">{key}</span>'
+                    self.action_log.append(button_style.format(msg))
+                    
+                elif action_type == "mouse_move":
+                    x = action_data.get('x', 0)
+                    y = action_data.get('y', 0)
+                    msg = f'🖱️ <span style="margin: 0 4px; color: #4CAF50;">Moved to</span> <span style="color: #4CAF50">({x}, {y})</span>'
+                    self.action_log.append(button_style.format(msg))
+                    
+                elif action_type == "screenshot":
+                    msg = '📸 <span style="margin: 0 4px; color: #4CAF50;">Captured Screenshot</span>'
+                    self.action_log.append(button_style.format(msg))
+                    
+                elif "click" in action_type:
+                    x = action_data.get('x', 0)
+                    y = action_data.get('y', 0)
+                    click_map = {
+                        "left_click": "Left Click",
+                        "right_click": "Right Click",
+                        "middle_click": "Middle Click",
+                        "double_click": "Double Click"
+                    }
+                    click_type = click_map.get(action_type, "Click")
+                    msg = f'👆 <span style="margin: 0 4px; color: #4CAF50;">{click_type}</span> <span style="color: #4CAF50">({x}, {y})</span>'
+                    self.action_log.append(button_style.format(msg))
+                    
+            except json.JSONDecodeError:
+                self.action_log.append(button_style.format(action_text))
+
+        # Clean assistant message style without green background
+        elif message.startswith("Assistant:"):
+            message_style = '''
+                <div style="
+                    border-left: 2px solid #666;
+                    padding: 8px 16px;
+                    margin: 8px 0;
+                    font-family: Inter, -apple-system, system-ui, sans-serif;
+                    font-size: 13px;
+                    line-height: 1.5;
+                    color: #e0e0e0;
+                ">{}</div>
+            '''
+            clean_message = message.replace("Assistant:", "").strip()
+            self.action_log.append(message_style.format(f'💬 {clean_message}'))
+
+        # Subtle assistant action style
         elif message.startswith("Assistant action:"):
-            icon = qta.icon('fa5s.cogs', color='#2196F3')
-            pixmap = icon.pixmap(24, 24)
-            icon_html = f'<img src="data:image/base64;base64,{self.pixmap_to_base64(pixmap)}" width="24" height="24"/>'
-            self.action_log.append(f'''
-                <div style="display: flex; align-items: center; margin: 5px 0; padding: 5px;">
-                    {icon_html}
-                    <p style="color: #2196F3; margin: 0 0 0 10px;"><em>{message}</em></p>
-                </div>
-            ''')
+            action_style = '''
+                <div style="
+                    color: #666;
+                    font-style: italic;
+                    padding: 4px 0;
+                    font-size: 12px;
+                    font-family: Inter, -apple-system, system-ui, sans-serif;
+                    line-height: 1.4;
+                ">🤖 {}</div>
+            '''
+            clean_message = message.replace("Assistant action:", "").strip()
+            self.action_log.append(action_style.format(clean_message))
+
+        # Regular message style
         else:
-            self.action_log.append(f'<p style="margin: 5px 0; color: #CCCCCC;">{message}</p>')
-        
-        # Scroll to the bottom of the log
-        self.action_log.verticalScrollBar().setValue(self.action_log.verticalScrollBar().maximum())
+            regular_style = '''
+                <div style="
+                    padding: 4px 0;
+                    color: #e0e0e0;
+                    font-family: Inter, -apple-system, system-ui, sans-serif;
+                    font-size: 13px;
+                    line-height: 1.4;
+                ">{}</div>
+            '''
+            self.action_log.append(regular_style.format(message))
+
+        # Scroll to bottom
+        self.action_log.verticalScrollBar().setValue(
+            self.action_log.verticalScrollBar().maximum()
+        )
         
     def mousePressEvent(self, event):
         self.oldPos = event.globalPosition().toPoint()
@@ -507,6 +633,14 @@ class MainWindow(QMainWindow):
         close_window = QShortcut(QKeySequence("Ctrl+W"), self)
         close_window.activated.connect(self.close)
         
+        # Add Ctrl+C to stop agent
+        stop_agent = QShortcut(QKeySequence("Ctrl+C"), self)
+        stop_agent.activated.connect(self.stop_agent)
+        
+        # Add Ctrl+Enter to send message
+        send_message = QShortcut(QKeySequence("Ctrl+Return"), self)
+        send_message.activated.connect(self.run_agent)
+        
         # Allow tab for indentation
         self.input_area.setTabChangesFocus(False)
         
@@ -514,6 +648,11 @@ class MainWindow(QMainWindow):
         self.input_area.keyPressEvent = self.handle_input_keypress
 
     def handle_input_keypress(self, event):
+        # Handle Ctrl + Enter to send message
+        if event.key() == Qt.Key.Key_Return and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            self.run_agent()
+            return
+        
         # Get cursor and text
         cursor = self.input_area.textCursor()
         text = self.input_area.toPlainText()
@@ -535,10 +674,24 @@ class MainWindow(QMainWindow):
             # Remove the extra newline if we're not at the start of the document
             if line_start > 0 and cursor.position() == line_start:
                 cursor.deletePreviousChar()
-        
         # Default handling for other keys
         else:
             QTextEdit.keyPressEvent(self.input_area, event)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

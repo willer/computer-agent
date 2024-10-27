@@ -1,8 +1,8 @@
 import logging
-import anthropic
 from anthropic_client import AnthropicClient
 from computer_control import ComputerControl
 from anthropic.types.beta import BetaMessage, BetaToolUseBlock, BetaTextBlock
+import json
 
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -64,7 +64,7 @@ class Store:
                     break
                 
                 self.computer_control.perform_action(action)
-                update_callback(f"Performed action: {action['type']}")
+
                 logger.info(f"Performed action: {action['type']}")
                 
                 screenshot = self.computer_control.take_screenshot()
@@ -142,6 +142,25 @@ class Store:
         if isinstance(message, BetaMessage):
             for item in message.content:
                 if isinstance(item, BetaTextBlock):
-                    update_callback(f"Assistant: {item.text}")
+                    # Clean and format the text
+                    text = item.text.strip()
+                    if text:  # Only send non-empty messages
+                        update_callback(f"Assistant: {text}")
                 elif isinstance(item, BetaToolUseBlock):
-                    update_callback(f"Assistant action: {item.name} - {item.input}")
+                    # Format tool use in a more readable way
+                    tool_name = item.name
+                    tool_input = item.input
+                    
+                    # Convert tool use to a more readable format
+                    if tool_name == 'computer':
+                        action = {
+                            'type': tool_input.get('action'),
+                            'x': tool_input.get('coordinate', [0, 0])[0] if 'coordinate' in tool_input else None,
+                            'y': tool_input.get('coordinate', [0, 0])[1] if 'coordinate' in tool_input else None,
+                            'text': tool_input.get('text')
+                        }
+                        update_callback(f"Performed action: {json.dumps(action)}")
+                    elif tool_name == 'finish_run':
+                        update_callback("Assistant: Task completed! ✨")
+                    else:
+                        update_callback(f"Assistant action: {tool_name} - {json.dumps(tool_input)}")
