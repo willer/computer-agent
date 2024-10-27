@@ -2,6 +2,12 @@
 
 Self-hosted desktop app to have AI control your computer, powered by the new Claude computer use capability. Allow Claude to take over your laptop and do your tasks for you (or at least attempt to, lol). Written in Python, using PyQt.
 
+## Demo
+Here, I asked it to use vim to create a game in Python, run it, and play it.
+
+https://github.com/user-attachments/assets/fa9b195e-fae6-4dbc-adb9-dc42519624b1
+
+
 ## ⚠️ Important Disclaimers
 
 1. **This is experimental software** - It gives an AI control of your mouse and keyboard. Things can and will go wrong.
