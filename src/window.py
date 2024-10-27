@@ -277,7 +277,7 @@ class MainWindow(QMainWindow):
         control_layout = QHBoxLayout()
         control_layout.setSpacing(8)
         
-        self.run_button = QPushButton(qta.icon('fa5s.play', color='white'), "Let's Go")
+        self.run_button = QPushButton(qta.icon('fa5s.play', color='white'), "Start")
         self.stop_button = QPushButton(qta.icon('fa5s.stop', color='white'), "Stop")
         
         for button in (self.run_button, self.stop_button):
