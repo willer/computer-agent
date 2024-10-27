@@ -1,4 +1,4 @@
-# 👨🏽‍💻 Grunty - Computer AI Agent
+# 👨🏽‍💻 Grunty
 
 Self-hosted desktop app to have AI control your computer, powered by the new Claude [computer use](https://www.anthropic.com/news/3-5-models-and-computer-use) capability. Allow Claude to take over your laptop and do your tasks for you (or at least attempt to, lol). Written in Python, using PyQt.
 
