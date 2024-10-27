@@ -1,9 +1,9 @@
 # 👨🏽‍💻 Grunty - Computer AI Agent
 
-Self-hosted desktop app to have AI control your computer, powered by the new Claude computer use capability. Allow Claude to take over your laptop and do your tasks for you (or at least attempt to, lol). Written in Python, using PyQt.
+Self-hosted desktop app to have AI control your computer, powered by the new Claude [computer use](https://www.anthropic.com/news/3-5-models-and-computer-use) capability. Allow Claude to take over your laptop and do your tasks for you (or at least attempt to, lol). Written in Python, using PyQt.
 
 ## Demo
-Here, I asked it to use vim to create a game in Python, run it, and play it.
+Here, I asked it to use [vim](https://vim.rtorr.com/) to create a game in Python, run it, and play it.
 
 https://github.com/user-attachments/assets/fa9b195e-fae6-4dbc-adb9-dc42519624b1
 
@@ -24,7 +24,7 @@ Anthropic can see your screen through screenshots during actions. Hide sensitive
 
 ## 🛠️ Setup
 
-Get an Anthropic API key [here](https://console.anthropic.com/keys).
+Get an Anthropic API key [here]([https://console.anthropic.com/keys](https://console.anthropic.com/dashboard)).
 
 ```bash
 # Python 3.10+ recommended
