@@ -26,6 +26,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.store = store
         self.anthropic_client = anthropic_client
+        self.app = QApplication.instance()  # Get the QApplication instance
         
         # Check if API key is missing
         if self.store.error and "ANTHROPIC_API_KEY not found" in self.store.error:
@@ -169,6 +170,23 @@ class MainWindow(QMainWindow):
         """)
         github_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl('https://github.com/suitedaces/computer-agent')))
         
+        config_button = QPushButton()
+        config_button.setIcon(qta.icon('fa5s.cog', color='white'))
+        config_button.setFlat(True)
+        config_button.setStyleSheet("""
+            QPushButton {
+                color: #ffffff;
+                background-color: transparent;
+                border-radius: 8px;
+                padding: 4px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #333333;
+            }
+        """)
+        config_button.clicked.connect(self.show_config_dialog)
+        
         minimize_button = QPushButton("—")
         minimize_button.setFlat(True)
         minimize_button.setStyleSheet("""
@@ -201,6 +219,7 @@ class MainWindow(QMainWindow):
         """)
         
         title_bar_layout.addWidget(github_button)
+        title_bar_layout.addWidget(config_button)
         title_bar_layout.addWidget(minimize_button)
         title_bar_layout.addWidget(close_button)
         container_layout.addWidget(title_bar)
@@ -695,3 +714,9 @@ class MainWindow(QMainWindow):
         # Default handling for other keys
         else:
             QTextEdit.keyPressEvent(self.input_area, event)
+
+    def show_config_dialog(self):
+        from .config_dialog import ConfigDialog
+        dialog = ConfigDialog(self)
+        dialog.exec()
+

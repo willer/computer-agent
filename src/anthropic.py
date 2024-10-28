@@ -3,6 +3,7 @@ from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock
 import os
 from dotenv import load_dotenv
 import logging
+import json
 
 class AnthropicClient:
     def __init__(self):
@@ -18,6 +19,32 @@ class AnthropicClient:
         
     def get_next_action(self, run_history) -> BetaMessage:
         try:
+            # Load system prompt from config
+            config_file = 'config.json'
+            base_system_prompt = """
+                The user will ask you to perform a task and you should use their computer to do so. 
+                After each step, take a screenshot and carefully evaluate if you have achieved the right outcome. 
+                Explicitly show your thinking: 'I have evaluated step X...' 
+                If not correct, try again. Only when you confirm a step was executed correctly should you move 
+                on to the next one. Note that you have to click into the browser address bar before typing a URL. 
+                You should always call a tool! Always return a tool call. Remember call the finish_run tool when you 
+                have achieved the goal of the task. Do not explain you have finished the task, just call the tool. 
+                Use keyboard shortcuts to navigate whenever possible. Please remember to take a screenshot after 
+                EVERY step to confirm you have achieved the right outcome.
+                If the target window is not in focus, then you may need to click on it a second time before clicking on the
+                object within it, like a button. Verify that you got the result you expected by taking a screenshot
+                and evaluate whether you need to adjust accordingly.
+            """
+            
+            system_prompt = base_system_prompt
+            
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                    additional_prompt = config.get('additional_system_prompt', '').strip()
+                    if additional_prompt:
+                        system_prompt = f"{base_system_prompt}\n\nAdditional Instructions:\n{additional_prompt}"
+
             # Convert BetaMessage objects to dictionaries
             cleaned_history = []
             for message in run_history:
@@ -62,20 +89,7 @@ class AnthropicClient:
                     }
                 ],
                 messages=cleaned_history,
-                system="""
-                The user will ask you to perform a task and you should use their computer to do so. 
-                After each step, take a screenshot and carefully evaluate if you have achieved the right outcome. 
-                Explicitly show your thinking: 'I have evaluated step X...' 
-                If not correct, try again. Only when you confirm a step was executed correctly should you move 
-                on to the next one. Note that you have to click into the browser address bar before typing a URL. 
-                You should always call a tool! Always return a tool call. Remember call the finish_run tool when you 
-                have achieved the goal of the task. Do not explain you have finished the task, just call the tool. 
-                Use keyboard shortcuts to navigate whenever possible. Please remember to take a screenshot after 
-                EVERY step to confirm you have achieved the right outcome.
-                If the target window is not in focus, then you may need to click on it a second time before clicking on the
-                object within it, like a button. Verify that you got the result you expected by taking a screenshot
-                and evaluate whether you need to adjust accordingly.
-                """,
+                system=system_prompt,
                 betas=["computer-use-2024-10-22"],
             )
 
