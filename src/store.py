@@ -16,6 +16,7 @@ class Store:
         self.error = None
         self.run_history = []
         self.last_tool_use_id = None
+        self.last_screenshot = None  # Add this line
         
         try:
             self.anthropic_client = AnthropicClient()
@@ -63,11 +64,14 @@ class Store:
                     self.running = False
                     break
                 
-                self.computer_control.perform_action(action)
+                result = self.computer_control.perform_action(action)
+                if action['type'] == 'screenshot':
+                    self.last_screenshot = result  # Store the screenshot
 
                 logger.info(f"Performed action: {action['type']}")
                 
                 screenshot = self.computer_control.take_screenshot()
+                self.last_screenshot = screenshot  # Store every screenshot
                 self.run_history.append({
                     "role": "user",
                     "content": [

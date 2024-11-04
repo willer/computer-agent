@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QTextEdit, 
-                             QPushButton, QLabel, QProgressBar, QSystemTrayIcon, QMenu, QApplication, QDialog, QLineEdit, QMenuBar)
+                             QPushButton, QLabel, QProgressBar, QSystemTrayIcon, QMenu, QApplication, QDialog, QLineEdit, QMenuBar, QTextBrowser)
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread, QUrl
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QAction, QTextCursor, QDesktopServices
 from .store import Store
@@ -225,10 +225,12 @@ class MainWindow(QMainWindow):
         container_layout.addWidget(title_bar)
         
         # Action log with modern styling - Now at the top with flexible space
-        self.action_log = QTextEdit()
+        self.action_log = QTextBrowser()
         self.action_log.setReadOnly(True)
+        self.action_log.setOpenExternalLinks(False)  # Prevent automatic link handling
+        self.action_log.anchorClicked.connect(self.handle_link_click)  # Connect link clicks
         self.action_log.setStyleSheet("""
-            QTextEdit {
+            QTextBrowser {
                 background-color: #262626;
                 border: none;
                 border-radius: 0;
@@ -522,25 +524,6 @@ class MainWindow(QMainWindow):
         if message.startswith("Performed action:"):
             action_text = message.replace("Performed action:", "").strip()
             
-            # Pill-shaped button style with green text
-            button_style = '''
-                <div style="margin: 6px 0;">
-                    <span style="
-                        display: inline-flex;
-                        align-items: center;
-                        background-color: rgba(45, 45, 45, 0.95);
-                        border: 1px solid rgba(255, 255, 255, 0.1);
-                        border-radius: 100px;
-                        padding: 4px 12px;
-                        color: #4CAF50;
-                        font-family: Inter, -apple-system, system-ui, sans-serif;
-                        font-size: 13px;
-                        line-height: 1.4;
-                        white-space: nowrap;
-                    ">{}</span>
-                </div>
-            '''
-            
             try:
                 import json
                 action_data = json.loads(action_text)
@@ -549,22 +532,39 @@ class MainWindow(QMainWindow):
                 if action_type == "type":
                     text = action_data.get('text', '')
                     msg = f'⌨️ <span style="margin: 0 4px; color: #4CAF50;">Typed</span> <span style="color: #4CAF50">"{text}"</span>'
-                    self.action_log.append(button_style.format(msg))
+                    self.action_log.append(self._format_pill(msg))
                     
                 elif action_type == "key":
                     key = action_data.get('text', '')
                     msg = f'⌨️ <span style="margin: 0 4px; color: #4CAF50;">Pressed</span> <span style="color: #4CAF50">{key}</span>'
-                    self.action_log.append(button_style.format(msg))
+                    self.action_log.append(self._format_pill(msg))
                     
                 elif action_type == "mouse_move":
                     x = action_data.get('x', 0)
                     y = action_data.get('y', 0)
                     msg = f'🖱️ <span style="margin: 0 4px; color: #4CAF50;">Moved to</span> <span style="color: #4CAF50">({x}, {y})</span>'
-                    self.action_log.append(button_style.format(msg))
+                    self.action_log.append(self._format_pill(msg))
                     
                 elif action_type == "screenshot":
-                    msg = '📸 <span style="margin: 0 4px; color: #4CAF50;">Captured Screenshot</span>'
-                    self.action_log.append(button_style.format(msg))
+                    msg = '''
+                        <div style="margin: 6px 0;">
+                            <a href="screenshot://" style="
+                                display: inline-flex;
+                                align-items: center;
+                                background-color: rgba(45, 45, 45, 0.95);
+                                border: 1px solid rgba(255, 255, 255, 0.1);
+                                border-radius: 100px;
+                                padding: 4px 12px;
+                                color: #4CAF50;
+                                text-decoration: none;
+                                font-family: Inter, -apple-system, system-ui, sans-serif;
+                                font-size: 13px;
+                                line-height: 1.4;
+                                white-space: nowrap;
+                            ">📸 View Screenshot</a>
+                        </div>
+                    '''
+                    self.action_log.append(msg)
                     
                 elif "click" in action_type:
                     x = action_data.get('x', 0)
@@ -577,10 +577,10 @@ class MainWindow(QMainWindow):
                     }
                     click_type = click_map.get(action_type, "Click")
                     msg = f'👆 <span style="margin: 0 4px; color: #4CAF50;">{click_type}</span> <span style="color: #4CAF50">({x}, {y})</span>'
-                    self.action_log.append(button_style.format(msg))
+                    self.action_log.append(self._format_pill(msg))
                     
             except json.JSONDecodeError:
-                self.action_log.append(button_style.format(action_text))
+                self.action_log.append(self._format_pill(action_text))
 
         # Clean assistant message style without green background
         elif message.startswith("Assistant:"):
@@ -630,7 +630,79 @@ class MainWindow(QMainWindow):
         self.action_log.verticalScrollBar().setValue(
             self.action_log.verticalScrollBar().maximum()
         )
+
+    def _format_pill(self, text):
+        return f'''
+            <div style="margin: 6px 0;">
+                <span style="
+                    display: inline-flex;
+                    align-items: center;
+                    background-color: rgba(45, 45, 45, 0.95);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 100px;
+                    padding: 4px 12px;
+                    font-family: Inter, -apple-system, system-ui, sans-serif;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    white-space: nowrap;
+                ">{text}</span>
+            </div>
+        '''
+
+    def show_screenshot(self, screenshot_data):
+        if not screenshot_data:
+            return
+            
+        # Create a new dialog to show the screenshot
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Screenshot")
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #1a1a1a;
+            }
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
         
+        # Create layout
+        layout = QVBoxLayout()
+        
+        # Convert base64 to QPixmap
+        import base64
+        from PyQt6.QtGui import QPixmap
+        pixmap_data = base64.b64decode(screenshot_data)
+        pixmap = QPixmap()
+        pixmap.loadFromData(pixmap_data)
+        
+        # Create label and set pixmap
+        label = QLabel()
+        label.setPixmap(pixmap)
+        label.setStyleSheet("background-color: #262626; padding: 8px;")
+        
+        # Add to layout
+        layout.addWidget(label)
+        
+        # Add close button
+        close_button = QPushButton("Close")
+        close_button.clicked.connect(dialog.close)
+        layout.addWidget(close_button)
+        
+        dialog.setLayout(layout)
+        dialog.exec()
+
+    def handle_link_click(self, url):
+        if url.scheme() == "screenshot":
+            self.show_screenshot(self.store.last_screenshot)
+
     def mousePressEvent(self, event):
         self.oldPos = event.globalPosition().toPoint()
 
