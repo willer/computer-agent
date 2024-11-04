@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QTextEdit, 
                              QPushButton, QLabel, QProgressBar, QSystemTrayIcon, QMenu, QApplication, QDialog, QLineEdit, QMenuBar, QTextBrowser)
-from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread, QUrl
+from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QThread, QUrl, QSettings
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QAction, QTextCursor, QDesktopServices
 from .store import Store
 from .anthropic import AnthropicClient  
@@ -27,6 +27,10 @@ class MainWindow(QMainWindow):
         self.store = store
         self.anthropic_client = anthropic_client
         self.app = QApplication.instance()  # Get the QApplication instance
+        
+        # Initialize theme settings
+        self.settings = QSettings('Grunty', 'Preferences')
+        self.dark_mode = self.settings.value('dark_mode', True, type=bool)
         
         # Check if API key is missing
         if self.store.error and "ANTHROPIC_API_KEY not found" in self.store.error:
@@ -146,17 +150,18 @@ class MainWindow(QMainWindow):
         title_bar.setLayout(title_bar_layout)
         
         title_label = QLabel("Grunty 👨🏽‍💻")
+        title_label.setObjectName("title_label")
         title_label.setFont(QFont("Inter", 16, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #ffffff; padding: 5px;")
         title_bar_layout.addWidget(title_label)
         
         title_bar_layout.addStretch()
         
-        # Window controls
-        github_button = QPushButton()
-        github_button.setIcon(qta.icon('fa5b.github', color='white'))  # Using qtawesome for GitHub icon
-        github_button.setFlat(True)
-        github_button.setStyleSheet("""
+        # Add theme toggle button before github button
+        self.theme_button = QPushButton()
+        self.update_theme_button()
+        self.theme_button.setFlat(True)
+        self.theme_button.setStyleSheet("""
             QPushButton {
                 color: #ffffff;
                 background-color: transparent;
@@ -168,7 +173,14 @@ class MainWindow(QMainWindow):
                 background-color: #333333;
             }
         """)
-        github_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl('https://github.com/suitedaces/computer-agent')))
+        self.theme_button.clicked.connect(self.toggle_theme)
+        title_bar_layout.addWidget(self.theme_button)
+        
+        # Window controls
+        github_button = QPushButton()
+        github_button.setObjectName("github_button")
+        github_button.setIcon(qta.icon('fa5b.github', color='white'))
+        github_button.setFlat(True)
         
         config_button = QPushButton()
         config_button.setIcon(qta.icon('fa5s.cog', color='white'))
@@ -188,35 +200,12 @@ class MainWindow(QMainWindow):
         config_button.clicked.connect(self.show_config_dialog)
         
         minimize_button = QPushButton("—")
+        minimize_button.setObjectName("minimize_button")
         minimize_button.setFlat(True)
-        minimize_button.setStyleSheet("""
-            QPushButton {
-                color: #ffffff;
-                background-color: transparent;
-                border-radius: 8px;
-                padding: 4px 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #333333;
-            }
-        """)
         
         close_button = QPushButton("×")
+        close_button.setObjectName("close_button")
         close_button.setFlat(True)
-        close_button.setStyleSheet("""
-            QPushButton {
-                color: #ffffff;
-                background-color: transparent;
-                border-radius: 8px;
-                padding: 4px 12px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #ff4444;
-            }
-        """)
         
         title_bar_layout.addWidget(github_button)
         title_bar_layout.addWidget(config_button)
@@ -262,6 +251,7 @@ class MainWindow(QMainWindow):
 
         # Input section container - Fixed height at bottom
         input_section = QWidget()
+        input_section.setObjectName("input_section")
         input_section.setStyleSheet("""
             QWidget {
                 background-color: #1e1e1e;
@@ -371,6 +361,181 @@ class MainWindow(QMainWindow):
         self.stop_button.clicked.connect(self.stop_agent)
         minimize_button.clicked.connect(self.showMinimized)
         close_button.clicked.connect(self.close)
+        
+        # Update the theme
+        self.apply_theme()
+        
+    def update_theme_button(self):
+        if self.dark_mode:
+            self.theme_button.setIcon(qta.icon('fa5s.sun', color='white'))
+            self.theme_button.setToolTip("Switch to Light Mode")
+        else:
+            self.theme_button.setIcon(qta.icon('fa5s.moon', color='black'))
+            self.theme_button.setToolTip("Switch to Dark Mode")
+
+    def toggle_theme(self):
+        self.dark_mode = not self.dark_mode
+        self.settings.setValue('dark_mode', self.dark_mode)
+        self.update_theme_button()
+        self.apply_theme()
+
+    def apply_theme(self):
+        if self.dark_mode:
+            # Dark theme colors
+            colors = {
+                'bg': '#1a1a1a',
+                'secondary_bg': '#262626',
+                'input_bg': '#1e1e1e',
+                'text': '#ffffff',
+                'button_text': '#ffffff',  # Add button text color
+                'secondary_text': '#666666',
+                'border': '#333333',
+                'accent': '#4CAF50',
+                'accent_hover': '#45a049',
+                'error': '#ff4444',
+                'error_hover': '#ff3333',
+                'button_hover': '#333333'  # Add button hover color
+            }
+        else:
+            # Light theme colors
+            colors = {
+                'bg': '#ffffff',
+                'secondary_bg': '#f5f5f5',
+                'input_bg': '#fafafa',
+                'text': '#000000',
+                'button_text': '#000000',  # Add button text color
+                'secondary_text': '#666666',
+                'border': '#e0e0e0',
+                'accent': '#4CAF50',
+                'accent_hover': '#45a049',
+                'error': '#ff4444',
+                'error_hover': '#ff3333',
+                'button_hover': '#e0e0e0'  # Add button hover color
+            }
+
+        # Update container styles
+        container_style = f"""
+            QWidget#container {{
+                background-color: {colors['bg']};
+                border-radius: 12px;
+                border: 1px solid {colors['border']};
+            }}
+        """
+        self.findChild(QWidget, "container").setStyleSheet(container_style)
+
+        # Update title label
+        self.findChild(QLabel, "title_label").setStyleSheet(f"color: {colors['text']}; padding: 5px;")
+
+        # Update action log
+        self.action_log.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {colors['secondary_bg']};
+                border: none;
+                border-radius: 0;
+                color: {colors['text']};
+                padding: 16px;
+                font-family: Inter;
+                font-size: 13px;
+            }}
+        """)
+
+        # Update input area
+        self.input_area.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {colors['secondary_bg']};
+                border: 1px solid {colors['border']};
+                border-radius: 8px;
+                color: {colors['text']};
+                padding: 12px;
+                font-family: Inter;
+                font-size: 14px;
+                selection-background-color: {colors['accent']};
+            }}
+            QTextEdit:focus {{
+                border: 1px solid {colors['accent']};
+            }}
+        """)
+
+        # Update progress bar
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                border: none;
+                background-color: {colors['secondary_bg']};
+                height: 2px;
+                margin: 0;
+            }}
+            QProgressBar::chunk {{
+                background-color: {colors['accent']};
+            }}
+        """)
+
+        # Update input section
+        input_section_style = f"""
+            QWidget {{
+                background-color: {colors['input_bg']};
+                border-top: 1px solid {colors['border']};
+            }}
+        """
+        self.findChild(QWidget, "input_section").setStyleSheet(input_section_style)
+
+        # Update window controls style
+        window_control_style = f"""
+            QPushButton {{
+                color: {colors['button_text']};
+                background-color: transparent;
+                border-radius: 8px;
+                padding: 4px 12px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {colors['button_hover']};
+            }}
+        """
+
+        # Apply to all window control buttons
+        for button in [self.theme_button, 
+                      self.findChild(QPushButton, "github_button"),
+                      self.findChild(QPushButton, "minimize_button"),
+                      self.findChild(QPushButton, "close_button")]:
+            if button:
+                button.setStyleSheet(window_control_style)
+
+        # Update GitHub button icon color
+        github_button = self.findChild(QPushButton, "github_button")
+        if github_button:
+            github_button.setIcon(qta.icon('fa5b.github', 
+                color=colors['button_text']))
+
+        # Update theme button icon
+        if self.dark_mode:
+            self.theme_button.setIcon(qta.icon('fa5s.sun', color=colors['button_text']))
+        else:
+            self.theme_button.setIcon(qta.icon('fa5s.moon', color=colors['button_text']))
+
+        # Update tray menu style if needed
+        if hasattr(self, 'tray_icon') and self.tray_icon.contextMenu():
+            self.tray_icon.contextMenu().setStyleSheet(f"""
+                QMenu {{
+                    background-color: {colors['bg']};
+                    color: {colors['text']};
+                    border: 1px solid {colors['border']};
+                    border-radius: 6px;
+                    padding: 5px;
+                }}
+                QMenu::item {{
+                    padding: 8px 25px 8px 8px;
+                    border-radius: 4px;
+                }}
+                QMenu::item:selected {{
+                    background-color: {colors['accent']};
+                    color: white;
+                }}
+                QMenu::separator {{
+                    height: 1px;
+                    background: {colors['border']};
+                    margin: 5px 0px;
+                }}
+            """)
         
     def update_run_button(self):
         self.run_button.setEnabled(bool(self.input_area.toPlainText().strip()))
@@ -757,23 +922,16 @@ class MainWindow(QMainWindow):
         self.input_area.keyPressEvent = self.handle_input_keypress
 
     def handle_input_keypress(self, event):
-        # Handle Ctrl + Enter to send message
+        # Handle tab key for indentation
+        if event.key() == Qt.Key.Key_Tab:
+            cursor = self.input_area.textCursor()
+            cursor.insertText("    ")  # Insert 4 spaces for tab
+            return
+            
+        # Handle Ctrl+Enter to run agent
         if event.key() == Qt.Key.Key_Return and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             self.run_agent()
             return
-        
-        # Get cursor and text
-        cursor = self.input_area.textCursor()
-        text = self.input_area.toPlainText()
-        position = cursor.position()
-        
-        # Handle Ctrl + Backspace (delete entire line)
-        if event.key() == Qt.Key.Key_Backspace and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            # Find the start and end of the current line
-            line_start = text.rfind('\n', 0, position)
-            line_start = line_start + 1 if line_start != -1 else 0
-            line_end = text.find('\n', position)
-            line_end = line_end if line_end != -1 else len(text)
             
             # Select and delete the entire line
             cursor.setPosition(line_start)
@@ -791,4 +949,3 @@ class MainWindow(QMainWindow):
         from .config_dialog import ConfigDialog
         dialog = ConfigDialog(self)
         dialog.exec()
-
